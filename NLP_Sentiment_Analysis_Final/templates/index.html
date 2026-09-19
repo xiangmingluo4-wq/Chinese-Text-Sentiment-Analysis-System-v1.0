@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ project_name }} - 中文文本情感分析系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">
+                    <span class="title-icon">📊</span>
+                    {{ project_name }}
+                </h1>
+                <p class="subtitle">基于 XGBoost + TF-IDF 的中文三分类情感分析系统</p>
+                <span class="version-badge">v{{ project_version }}</span>
+            </div>
+        </header>
+
+        <!-- 标签页导航 -->
+        <div class="tabs">
+            <div class="tab active" data-tab="batch">
+                <span class="tab-icon">📁</span>
+                <span>批量分析</span>
+            </div>
+            <div class="tab" data-tab="single">
+                <span class="tab-icon">📝</span>
+                <span>单句分析</span>
+            </div>
+            <div class="tab" data-tab="chat">
+                <span class="tab-icon">🤖</span>
+                <span>智能客服</span>
+                <span class="tab-badge">创新</span>
+            </div>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="content">
+            <!-- ================== 批量分析面板 ================== -->
+            <div class="tab-panel active" id="batch-panel">
+                <!-- 上传区域 -->
+                <div class="upload-section">
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-icon">📤</div>
+                        <h3>点击或拖拽文件到此处上传</h3>
+                        <p>支持 CSV 格式，需包含 text 列</p>
+                        <p class="upload-hint">示例数据：10000条评论，约几秒完成分析</p>
+                        <input type="file" id="file-input" accept=".csv" style="display: none;">
+                    </div>
+                    <button class="btn btn-primary" id="upload-btn">选择文件</button>
+                </div>
+
+                <!-- 加载状态 -->
+                <div class="loading-section" id="loading-section" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>正在分析中，请稍候...</p>
+                    <p class="loading-progress" id="loading-progress">0%</p>
+                </div>
+
+                <!-- 结果区域 -->
+                <div class="result-section" id="result-section" style="display: none;">
+                    <!-- 统计卡片 -->
+                    <div class="stats-cards">
+                        <div class="stat-card total">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-total">0</div>
+                                <div class="stat-label">总数据量</div>
+                            </div>
+                        </div>
+                        <div class="stat-card positive">
+                            <div class="stat-icon">😊</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-positive">0</div>
+                                <div class="stat-label">正面评价</div>
+                            </div>
+                        </div>
+                        <div class="stat-card negative">
+                            <div class="stat-icon">😠</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-negative">0</div>
+                                <div class="stat-label">负面评价</div>
+                            </div>
+                        </div>
+                        <div class="stat-card neutral">
+                            <div class="stat-icon">😐</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="stat-neutral">0</div>
+                                <div class="stat-label">中性评价</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 图表区域 -->
+                    <div class="charts-section">
+                        <div class="chart-container">
+                            <h3>情感分布</h3>
+                            <div id="pie-chart" class="chart"></div>
+                        </div>
+                        <div class="chart-container">
+                            <h3>情感占比</h3>
+                            <div id="bar-chart" class="chart"></div>
+                        </div>
+                    </div>
+
+                    <!-- 关键词区域 -->
+                    <div class="keywords-section">
+                        <div class="keywords-container">
+                            <h3>🌟 正面高频词</h3>
+                            <div class="keywords-list" id="positive-keywords">
+                                <span class="keyword-placeholder">暂无数据</span>
+                            </div>
+                        </div>
+                        <div class="keywords-container">
+                            <h3>💔 负面高频词</h3>
+                            <div class="keywords-list" id="negative-keywords">
+                                <span class="keyword-placeholder">暂无数据</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 数据预览（添加了“修正”列） -->
+                    <div class="preview-section">
+                        <div class="preview-header">
+                            <h3>数据预览（前50条）</h3>
+                            <button class="btn btn-success" id="export-btn">
+                                <span>📥</span> 导出结果
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table" id="preview-table">
+                                <thead>
+                                    <tr>
+                                        <th>序号</th>
+                                        <th>文本内容</th>
+                                        <th>情感</th>
+                                        <th>置信度</th>
+                                        <th>修正</th>   <!-- ✅ 新增列 -->
+                                    </tr>
+                                </thead>
+                                <tbody id="preview-tbody">
+                                    <!-- 由 JavaScript 动态渲染 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================== 单句分析面板 ================== -->
+            <div class="tab-panel" id="single-panel">
+                <div class="single-section">
+                    <div class="input-section">
+                        <h3>输入文本</h3>
+                        <textarea
+                            class="text-input"
+                            id="single-input"
+                            placeholder="请输入要分析的中文文本，例如：这个手机真的太棒了，拍照效果非常好！"
+                            rows="4"
+                        ></textarea>
+                        <div class="input-actions">
+                            <button class="btn btn-primary btn-large" id="single-analyze-btn">
+                                <span>🔍</span> 开始分析
+                            </button>
+                            <button class="btn btn-secondary" id="single-clear-btn">
+                                <span>🗑️</span> 清空
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 单句分析结果 + 反馈 -->
+                    <div class="result-display" id="single-result" style="display: none;">
+                        <div class="result-card">
+                            <div class="result-header">
+                                <h3>分析结果</h3>
+                            </div>
+                            <div class="result-body">
+                                <div class="sentiment-display" id="sentiment-display">
+                                    <div class="sentiment-emoji" id="sentiment-emoji">😊</div>
+                                    <div class="sentiment-label" id="sentiment-label">正面</div>
+                                    <div class="sentiment-confidence">
+                                        置信度：<span id="confidence-value">95.00%</span>
+                                    </div>
+                                </div>
+
+                                <div class="probability-section">
+                                    <h4>各类别概率</h4>
+                                    <div class="probability-bars">
+                                        <div class="prob-bar">
+                                            <div class="prob-label">正面 😊</div>
+                                            <div class="prob-track">
+                                                <div class="prob-fill positive" id="prob-positive" style="width: 0%"></div>
+                                            </div>
+                                            <div class="prob-value" id="prob-positive-value">0%</div>
+                                        </div>
+                                        <div class="prob-bar">
+                                            <div class="prob-label">负面 😠</div>
+                                            <div class="prob-track">
+                                                <div class="prob-fill negative" id="prob-negative" style="width: 0%"></div>
+                                            </div>
+                                            <div class="prob-value" id="prob-negative-value">0%</div>
+                                        </div>
+                                        <div class="prob-bar">
+                                            <div class="prob-label">中性 😐</div>
+                                            <div class="prob-track">
+                                                <div class="prob-fill neutral" id="prob-neutral" style="width: 0%"></div>
+                                            </div>
+                                            <div class="prob-value" id="prob-neutral-value">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="keywords-section-single">
+                                    <h4>关键词提取</h4>
+                                    <div class="keywords-list" id="single-keywords">
+                                        <span class="keyword-placeholder">暂无数据</span>
+                                    </div>
+                                </div>
+
+                                <!-- ✅ 新增：单句反馈区域 -->
+                                <div class="feedback-area single-feedback" id="single-feedback" style="margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 15px;">
+                                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                        <span style="font-weight: 500;">标注有误？请修正：</span>
+                                        <select id="single-correct-select" class="feedback-select">
+                                            <option value="positive">正面 😊</option>
+                                            <option value="negative">负面 😠</option>
+                                            <option value="neutral">中性 😐</option>
+                                        </select>
+                                        <button class="btn btn-sm btn-primary" id="single-feedback-btn">提交修正</button>
+                                        <span id="single-feedback-msg" style="color: #10b981; font-size: 0.9rem;"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================== 智能客服面板 ================== -->
+            <div class="tab-panel" id="chat-panel">
+                <div class="chat-section">
+                    <div class="chat-header">
+                        <div class="chat-avatar">🤖</div>
+                        <div class="chat-info">
+                            <h3>智能客服小助手</h3>
+                            <p class="chat-status">
+                                <span class="status-dot online"></span>
+                                在线 · 情感联动模式
+                            </p>
+                        </div>
+                        <div class="chat-badge">
+                            <span>⭐ 创新功能</span>
+                        </div>
+                    </div>
+
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message bot">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <p>你好！我是智能客服小助手~</p>
+                                <p>我可以帮您解答系统使用问题，还能感知您的情绪哦~</p>
+                                <p>有什么可以帮您的吗？😊</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <textarea
+                            class="chat-input"
+                            id="chat-input"
+                            placeholder="输入您的问题，按 Enter 发送，Shift+Enter 换行"
+                            rows="2"
+                        ></textarea>
+                        <button class="btn btn-primary" id="chat-send-btn">
+                            <span>📤</span> 发送
+                        </button>
+                    </div>
+
+                    <div class="chat-tips">
+                        <span class="tip">💡 提示：试试说"这个系统太差了"，看看我会怎么安抚你~</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>© 2026 {{ project_name }} | 广州城建职业学院 | AI数据训练课程实训项目</p>
+            <p class="footer-tags">
+                <span class="tag">SVM</span>
+                <span class="tag">TF-IDF</span>
+                <span class="tag">情感分析</span>
+                <span class="tag">Flask</span>
+<!--                <span class="tag">创新加分</span>-->
+            </p>
+        </footer>
+    </div>
+
+    <!-- 引用 main.js（原有逻辑，保留） -->
+    <script src="/static/js/main.js"></script>
+
+    <!-- ✅ 新增：反馈闭环前端脚本（扩展原有功能，不冲突） -->
+    <script>
+        (function() {
+            'use strict';
+
+            // ---------- 工具函数：从表情符号映射到标签 ----------
+            function emojiToLabel(emojiStr) {
+                if (emojiStr.includes('😊')) return 'positive';
+                if (emojiStr.includes('😠')) return 'negative';
+                if (emojiStr.includes('😐')) return 'neutral';
+                // 后备：尝试从文本中提取
+                if (emojiStr.includes('正面')) return 'positive';
+                if (emojiStr.includes('负面')) return 'negative';
+                if (emojiStr.includes('中性')) return 'neutral';
+                return 'neutral';
+            }
+
+            // ---------- 提交反馈（批量/单句通用） ----------
+            function submitFeedback(text, predictedLabel, confidence, correctedLabel, callback) {
+                fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text,
+                        predicted_label: predictedLabel,
+                        corrected_label: correctedLabel,
+                        confidence: confidence
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (callback) callback(true, data);
+                    } else {
+                        if (callback) callback(false, data);
+                    }
+                })
+                .catch(err => {
+                    console.error('反馈提交失败:', err);
+                    if (callback) callback(false, { message: err.message });
+                });
+            }
+
+            // ---------- 为批量表格每行添加反馈事件 ----------
+            function attachBatchFeedback() {
+                const tbody = document.getElementById('preview-tbody');
+                if (!tbody) return;
+                const rows = tbody.querySelectorAll('tr');
+                rows.forEach((row, index) => {
+                    // 避免重复绑定
+                    if (row.dataset.feedbackAttached === 'true') return;
+                    row.dataset.feedbackAttached = 'true';
+
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length < 5) return; // 确保有修正列
+
+                    // 获取文本（第2列）、情感（第3列）、置信度（第4列）
+                    const textCell = cells[1];
+                    const sentimentCell = cells[2];
+                    const confCell = cells[3];
+                    const feedbackCell = cells[4];
+
+                    // 提取数据
+                    const text = textCell ? textCell.textContent.trim() : '';
+                    const sentimentText = sentimentCell ? sentimentCell.textContent.trim() : '';
+                    // 从表情或文字中提取标签
+                    const predictedLabel = emojiToLabel(sentimentText);
+                    const confidenceStr = confCell ? confCell.textContent.trim().replace('%', '') : '0';
+                    const confidence = parseFloat(confidenceStr) / 100;
+
+                    // 构建反馈控件（如果尚未存在）
+                    if (!feedbackCell.querySelector('.feedback-controls')) {
+                        const select = document.createElement('select');
+                        select.className = 'feedback-select';
+                        select.innerHTML = `
+                            <option value="positive">正面 😊</option>
+                            <option value="negative">负面 😠</option>
+                            <option value="neutral">中性 😐</option>
+                        `;
+                        // 默认选中当前预测
+                        select.value = predictedLabel;
+
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-sm btn-primary';
+                        btn.textContent = '提交';
+                        btn.style.marginLeft = '5px';
+
+                        const msgSpan = document.createElement('span');
+                        msgSpan.className = 'feedback-msg';
+                        msgSpan.style.marginLeft = '5px';
+                        msgSpan.style.fontSize = '0.8rem';
+
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'feedback-controls';
+                        wrapper.appendChild(select);
+                        wrapper.appendChild(btn);
+                        wrapper.appendChild(msgSpan);
+
+                        // 清空原有内容，放入新控件
+                        feedbackCell.innerHTML = '';
+                        feedbackCell.appendChild(wrapper);
+
+                        // 绑定点击事件
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            const corrected = select.value;
+                            const msgEl = wrapper.querySelector('.feedback-msg');
+
+                            // 禁用按钮防止重复提交
+                            btn.disabled = true;
+                            btn.textContent = '提交中...';
+
+                            submitFeedback(text, predictedLabel, confidence, corrected, function(success, data) {
+                                if (success) {
+                                    msgEl.textContent = '✅ 已修正，感谢！';
+                                    msgEl.style.color = '#10b981';
+                                    // 可改变行背景色表示已修正
+                                    row.style.backgroundColor = '#f0fdf4';
+                                } else {
+                                    msgEl.textContent = '❌ ' + (data.message || '提交失败，请重试');
+                                    msgEl.style.color = '#ef4444';
+                                    btn.disabled = false;
+                                    btn.textContent = '提交';
+                                }
+                                // 3秒后清除消息
+                                setTimeout(() => {
+                                    msgEl.textContent = '';
+                                }, 5000);
+                            });
+                        });
+                    }
+                });
+            }
+
+            // ---------- 监听批量结果加载完成（通过 MutationObserver 观察 tbody 变化） ----------
+            function observeBatchResult() {
+                const tbody = document.getElementById('preview-tbody');
+                if (!tbody) return;
+
+                const observer = new MutationObserver(function(mutations) {
+                    // 当 tbody 内容发生变化时，重新绑定反馈
+                    attachBatchFeedback();
+                });
+                observer.observe(tbody, { childList: true, subtree: true });
+
+                // 初始绑定一次
+                setTimeout(attachBatchFeedback, 300);
+            }
+
+            // ---------- 单句反馈事件绑定 ----------
+            function setupSingleFeedback() {
+                const btn = document.getElementById('single-feedback-btn');
+                if (!btn) return;
+                // 避免重复绑定
+                if (btn.dataset.bound === 'true') return;
+                btn.dataset.bound = 'true';
+
+                const select = document.getElementById('single-correct-select');
+                const msgEl = document.getElementById('single-feedback-msg');
+
+                btn.addEventListener('click', function() {
+                    // 获取当前显示的结果
+                    const textEl = document.getElementById('single-input');
+                    const text = textEl ? textEl.value.trim() : '';
+
+                    const emojiEl = document.getElementById('sentiment-emoji');
+                    const labelEl = document.getElementById('sentiment-label');
+                    const confEl = document.getElementById('confidence-value');
+
+                    if (!text || !emojiEl || !labelEl || !confEl) {
+                        msgEl.textContent = '❌ 请先进行分析';
+                        msgEl.style.color = '#ef4444';
+                        return;
+                    }
+
+                    const sentimentText = labelEl.textContent.trim() + ' ' + emojiEl.textContent.trim();
+                    const predictedLabel = emojiToLabel(sentimentText);
+                    const confidenceStr = confEl.textContent.trim().replace('%', '');
+                    const confidence = parseFloat(confidenceStr) / 100;
+                    const corrected = select.value;
+
+                    // 禁用按钮
+                    btn.disabled = true;
+                    btn.textContent = '提交中...';
+
+                    submitFeedback(text, predictedLabel, confidence, corrected, function(success, data) {
+                        if (success) {
+                            msgEl.textContent = '✅ 已修正，感谢！';
+                            msgEl.style.color = '#10b981';
+                        } else {
+                            msgEl.textContent = '❌ ' + (data.message || '提交失败，请重试');
+                            msgEl.style.color = '#ef4444';
+                            btn.disabled = false;
+                            btn.textContent = '提交修正';
+                        }
+                        setTimeout(() => {
+                            msgEl.textContent = '';
+                        }, 5000);
+                    });
+                });
+            }
+
+            // ---------- 初始化 ----------
+            window.addEventListener('DOMContentLoaded', function() {
+                // 批量反馈
+                observeBatchResult();
+
+                // 单句反馈
+                setupSingleFeedback();
+
+                // 当单句分析结果展示时，重新绑定（因为按钮可能被重新创建？但我们的按钮是固定的，只需绑定一次）
+                // 但为了防止页面切换后失效，再次绑定
+                // 监听单句结果出现
+                const resultPanel = document.getElementById('single-result');
+                if (resultPanel) {
+                    const observer = new MutationObserver(function() {
+                        if (resultPanel.style.display !== 'none') {
+                            // 可能更新了内容，重新绑定（但按钮固定，只需检查状态）
+                            setupSingleFeedback();
+                        }
+                    });
+                    observer.observe(resultPanel, { attributes: true, attributeFilter: ['style'] });
+                }
+
+                // 每次点击“开始分析”后，可能更新结果，但我们的按钮一直存在，无需额外操作
+                // 但为了让用户知道修正按钮有效，可以在分析完成后自动启用
+                const analyzeBtn = document.getElementById('single-analyze-btn');
+                if (analyzeBtn) {
+                    analyzeBtn.addEventListener('click', function() {
+                        // 延迟一会儿等待结果渲染
+                        setTimeout(function() {
+                            const btn = document.getElementById('single-feedback-btn');
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.textContent = '提交修正';
+                            }
+                        }, 500);
+                    });
+                }
+            });
+
+        })();
+    </script>
+
+</body>
+</html>

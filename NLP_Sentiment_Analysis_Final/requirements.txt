@@ -1,0 +1,24 @@
+Flask>=2.0.0
+Flask-CORS>=3.0.0
+
+scikit-learn>=1.0.0
+joblib>=1.1.0
+sentence-transformers==2.2.2
+xgboost==2.0.0
+
+pandas>=1.5.0
+numpy>=1.21.0
+
+jieba>=0.42.1
+
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# dvc>=2.0.0
+
+tqdm>=4.60.0
+click>=8.0.0
+
+
+
+
